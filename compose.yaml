@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  proxy:
+    build: ./packages/proxy
+    container_name: thermologger-proxy
+    ports:
+      - 8080:80
+    volumes:
+      - ./packages/proxy/nginx.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - app
+      - api
+    networks:
+      - app-network
+
+  app:
+    build: ./packages/client
+    container_name: thermologger-app
+    volumes:
+      - ./packages/client/build/client:/app/client
+      - ./packages/client/build/server:/app/server
+    #environment:
+      #- PUBLIC_API_URL=http://192.168.1.16:8080/api
+    networks:
+      - app-network
+
+  api:
+    build: ./packages/server
+    container_name: thermologger-api
+    volumes:
+      - ./packages/server/main.ts:/app/main.ts
+      - ./packages/server/src:/app/src
+    depends_on:
+      - influxdb
+    environment:
+      - INFLUX_URL=http://influxdb:8086
+      - INFLUX_TOKEN=Bwf3c5gH-kEKHB_X6dNcXAOp1CHUtzwa20irfvoMsyO1UA-Njh87wEm7pkX4MhFgMmjxkPpTbDly2pUwKeqzwg==
+      - INFLUX_ORG=personal
+      - INFLUX_BUCKET=thermo
+    networks:
+      - app-network
+
+  influxdb:
+    image: influxdb:latest
+    container_name: thermologger-influxdb
+    ports:
+      - 8086:8086
+    volumes:
+      - ./packages/influxdb/data:/var/lib/influxdb2
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge

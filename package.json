@@ -10,7 +10,7 @@
   "scripts": {
     "client": "yarn workspace client",
     "server": "yarn workspace server",
-    "build":"docker compose build --no-cache",
+    "build":"yarn client build && docker compose build --no-cache",
     "up":"docker compose up -d",
     "down":"docker compose down"
   }

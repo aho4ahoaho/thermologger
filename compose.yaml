@@ -20,8 +20,6 @@ services:
     volumes:
       - ./packages/client/build/client:/app/client
       - ./packages/client/build/server:/app/server
-    #environment:
-      #- PUBLIC_API_URL=http://192.168.1.16:8080/api
     networks:
       - app-network
 
@@ -35,9 +33,6 @@ services:
       - influxdb
     environment:
       - INFLUX_URL=http://influxdb:8086
-      - INFLUX_TOKEN=Bwf3c5gH-kEKHB_X6dNcXAOp1CHUtzwa20irfvoMsyO1UA-Njh87wEm7pkX4MhFgMmjxkPpTbDly2pUwKeqzwg==
-      - INFLUX_ORG=personal
-      - INFLUX_BUCKET=thermo
     networks:
       - app-network
 

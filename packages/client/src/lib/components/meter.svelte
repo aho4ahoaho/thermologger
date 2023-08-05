@@ -1,6 +1,5 @@
 <script lang="ts">
 	import type { ThermoData } from '$lib';
-	import { onMount } from 'svelte';
 	export let data: ThermoData|null=null;
 
 	let frame: HTMLDivElement;
@@ -19,15 +18,16 @@
 <style>
 	div {
 		width: 100%;
-		height: 100%;
 		display: flex;
-		justify-content: space-evenly;
+		justify-content: center;
 		align-items: center;
 		flex-wrap: wrap;
 	}
 	p {
-		max-height: fit-content;
+		flex-grow: 1;
+		flex-basis: 200px;
 		margin: 0;
 		font-size: 3rem;
+		text-align: center;
 	}
 </style>

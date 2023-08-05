@@ -5,35 +5,28 @@
 	import Meter from '$lib/components/meter.svelte';
 	import { env } from '$env/dynamic/public';
 	import { page } from '$app/stores';
-	import { get } from 'svelte/store';
 
 	let data: ThermoData[] = [];
-	let nowData: ThermoData = {
-		time: 0,
-		temperature: 0,
-		humidity: 0,
-		pressure: 0
-	};
-	let selected: any;
+	let nowData: ThermoData | null = null;
+	let selected: object;
 	let selectedData: DisplayInfo = {
 		temperature: true,
 		humidity: true,
 		pressure: true,
 		MA_temperature: false,
 		MA_humidity: false,
-		MA_pressure: false
+		MA_pressure: false,
+		Abs_humidity: false
 	};
-	let scale: number = 1;
+	let scale = 1;
 	const URL = env.PUBLIC_API_URL ?? $page.url.origin + '/api';
 	let loading = true;
-
-	console.log(URL);
 
 	const getData = async () => {
 		const url = scale === 0.5 ? `${URL}/get` : `${URL}/get?scale=${scale}`;
 		const res = await fetch(url).then((r) => r.json());
 		data = (res.data as ThermoData[]).sort((a, b) => a.time - b.time);
-		nowData = data[data.length - 1];
+		nowData = data.length !== 0 ? data[data.length - 1] : null;
 		loading = false;
 	};
 
@@ -51,19 +44,16 @@
 		getData();
 	};
 
-	const handleDataChange = (e: Event) => {
+	const handleDataChange = () => {
 		loading = true;
 		setTimeout(() => {
 			loading = false;
 		}, 10);
 	};
 
-	const handleReloadButton = (e: Event) => {
+	const handleReloadButton = async () => {
 		loading = true;
-		getData();
-		setTimeout(() => {
-			loading = false;
-		}, 10);
+		await getData();
 	};
 </script>
 
@@ -71,8 +61,8 @@
 	<Meter data={nowData} />
 	<Graph {data} displayInfo={selectedData} />
 {:else}
-	<Meter/>
-	<Graph/>
+	<Meter data={nowData} />
+	<Graph />
 {/if}
 <div class="settings">
 	<div class="displayData">
@@ -130,6 +120,15 @@
 			/>
 			<label for="MA_Pressure">MA_Pressure</label>
 		</div>
+		<div>
+			<input
+				type="checkbox"
+				id="Abs_humidity"
+				bind:checked={selectedData.Abs_humidity}
+				on:change={handleDataChange}
+			/>
+			<label for="Abs_humidity">Abs_humidity</label>
+		</div>
 	</div>
 	<div>
 		<input type="button" value="reload" on:click={handleReloadButton} />
@@ -150,38 +149,41 @@
 </div>
 
 <style lang="scss">
-	div.displayData {
-		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
-		div {
-			width: 10rem;
-		}
-	}
-	input[type='button'] {
-		height: 100%;
-		font-size: 1.5rem;
-		padding: 0.5rem 1rem;
-		border-radius: 0.5rem;
-		border: 1px solid #ccc;
-		outline: none;
-	}
 	div.settings {
 		width: min(max(80%, 1000px), 100%);
 		margin: 0 auto;
 		display: flex;
-		justify-content: space-between;
+		justify-content: center;
 		align-items: center;
+		flex-wrap: wrap;
 		> * {
 			margin: 0 0.5rem;
 		}
-		select {
-			height: 100%;
-			font-size: 1.5rem;
-			padding: 0.5rem 1rem;
-			border-radius: 0.5rem;
-			border: 1px solid #ccc;
-			outline: none;
+
+		div.displayData {
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			flex-wrap: wrap;
+			flex: 1;
+			flex-shrink: 0;
+			flex-basis: 200px;
+			div {
+				width: 10rem;
+			}
+		}
+		> div:not(.displayData) {
+			min-width: 200px;
+			> * {
+				width: 100%;
+				height: 100%;
+				text-align: center;
+				font-size: 1.5rem;
+				padding: 0.5rem 0;
+				border-radius: 0.5rem;
+				border: 1px solid #ccc;
+				outline: none;
+			}
 		}
 	}
 </style>

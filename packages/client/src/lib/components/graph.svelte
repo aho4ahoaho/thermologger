@@ -8,25 +8,22 @@
 	} from '$lib';
 	import { onMount } from 'svelte';
 
-	export let data: ThermoData[]=[];
+	export let data: ThermoData[] = [];
 	export let displayInfo: DisplayInfo = {
 		temperature: true,
-		humidity: true,
-		pressure: true,
-		MA_temperature: true,
-		MA_humidity: true,
-		MA_pressure: true
 	};
-
+	//element
 	let canvas: HTMLCanvasElement;
 	let frame: HTMLDivElement;
-	let leftScale: HTMLDivElement;
-	let rightScale: HTMLDivElement;
-	let yScale: HTMLDivElement;
+	let innerWidth = 0;
 
+	//data
+	let leftScale: string[] = ['0℃', '99.9℃'];
+	let rightScale: string[] = ['0%', '99%'];
+	let xScale: string[] = ['0:00', '24:00'];
 	const viewData: ViewData[] = graphDataGenerator(data, displayInfo);
 
-	const resize = () => {
+	const resize = async () => {
 		if (!canvas) return;
 		if (canvas.width != null && canvas.height != null) {
 			canvas.width = 0;
@@ -35,26 +32,33 @@
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
 		if (data.length === 0) {
-			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			canvas.width = frame.clientWidth;
+			canvas.height = frame.clientHeight;
+			ctx.fillStyle = 'white';
+			ctx.fillRect(0, 0, canvas.width, canvas.height);
 			return;
 		}
-		resetScale();
-		setXScale(
-			data.map((d) => d.temperature),
-			{ Unit: '°C', digits: 1, target: 'left' }
-		);
-		setXScale(
-			data.map((d) => d.humidity),
-			{ Unit: '%', digits: 0, target: 'right' }
-		);
-		setYScale(
-			data.map((d) => d.time),
-			{ Unit: 'h', digits: 1 }
-		);
-		/*setXScale(
-			data.map((d) => d.pressure),
-			{ Unit: 'hPa', digits: 0 }
-		);*/
+
+		leftScale =
+			displayInfo.temperature || displayInfo.MA_temperature
+				? scaleGenNum(
+						data.map((d) => d.temperature),
+						1,
+						'℃'
+				  )
+				: [];
+		rightScale =
+			displayInfo.humidity || displayInfo.MA_humidity 
+				? scaleGenNum(
+						data.map((d) => d.humidity),
+						0,
+						'%'
+				  )
+				: [];
+		xScale = scaleGenDate(new Date(data[0].time), new Date(data[data.length - 1].time));
+
+		await new Promise((resolve) => setTimeout(resolve, 1));
+
 		const width = frame.clientWidth;
 		const height = frame.clientHeight;
 		const offset = 10;
@@ -71,7 +75,7 @@
 		ctx.lineWidth = 1;
 		const scaleStep = 10;
 
-		//draw scale
+		//draw grid
 		ctx.strokeStyle = 'rgba(0,0,0,0.25)';
 		for (let i = 0; i < scaleStep; i++) {
 			ctx.beginPath();
@@ -86,13 +90,13 @@
 		}
 
 		// draw lines
-		viewData.forEach(({ label, color, data, range }, i) => {
+		viewData.forEach(({ color, data, range }) => {
 			ctx.strokeStyle = color;
 			strokeGraph(canvas, data, range);
 		});
 
 		// draw labels
-		viewData.forEach(({ label, color, data }, i) => {
+		viewData.forEach(({ label, color }, i) => {
 			ctx.fillStyle = 'white';
 			const { width } = ctx.measureText(label);
 			ctx.fillRect(offset, fontSize * i + offset, width, fontSize);
@@ -101,68 +105,76 @@
 		});
 	};
 
-	const setXScale = (
-		data: number[],
-		options: { Unit?: string; digits?: number; target?: 'left' | 'right' } = {}
-	) => {
-		const target = options.target !== 'right' ? leftScale : rightScale;
-		const [upper, middle, lower] = target.children;
-		const { Unit, digits } = options;
-		if (!upper || !middle || !lower) return;
+	const scaleGenNum = (data: number[], digits = 1, Unit = ''): string[] => {
+		if (data.length === 0) return [];
 		const max = Math.max(...data);
 		const min = Math.min(...data);
-		upper.textContent += max.toFixed(digits ?? 1) + (Unit ?? '');
-		middle.textContent += ((max + min) / 2).toFixed(digits ?? 1) + (Unit ?? '');
-		lower.textContent += min.toFixed(digits ?? 1) + (Unit ?? '');
+		const range = max - min;
+		const step = range / 10;
+		let scale = [];
+		for (let i = 0; i <= 10; i++) {
+			scale.push(min + step * i);
+		}
+		if (frame.clientHeight < 300) {
+			scale = scale.map((s, i) => (i % 5 === 0 ? s : undefined)).filter((s) => s !== undefined) as number[];
+		}
+		scale = scale.map((s) => s.toFixed(digits) + Unit)
+		scale = Array.from(new Set(scale));
+		if(scale.length === 1){
+			scale = [scale[0] , scale[0]];
+		}
+
+		return scale
 	};
-
-	const setYScale = (data: number[], options: { Unit?: string; digits?: number } = {}) => {
-		const [upper, middle, lower] = yScale.children;
-		const { Unit, digits } = options;
-		const start = new Date(data[0]);
-		const end = new Date(data[data.length - 1]);
-		const range = (end.getTime() - start.getTime()) / 2 / 1000 / 1800;
-
-		upper.textContent += '-' + range.toFixed(digits ?? 1) + (Unit ?? '');
-		middle.textContent += '-' + (range / 2).toFixed(digits ?? 1) + (Unit ?? '');
-		lower.textContent += '0' + (Unit ?? '');
-	};
-
-	const resetScale = () => {
-		[leftScale, rightScale, yScale].forEach((scale) => {
-			const [upper, middle, lower] = scale.children;
-			if (!upper || !middle || !lower) return;
-			upper.textContent = '';
-			middle.textContent = '';
-			lower.textContent = '';
-		});
+	const scaleGenDate = (start: Date, end: Date): string[] => {
+		const scale = [];
+		const range = end.getTime() - start.getTime();
+		const step = range / 10;
+		for (let i = 0; i <= 10; i++) {
+			const date = new Date(start.getTime() + step * i);
+			scale.push(date.getHours().toString() + ':' + date.getMinutes().toString().padStart(2, '0'));
+		}
+		if (innerWidth < 600) {
+			return scale.map((s, i) => (i % 5 === 0 ? s : '')).filter((s) => s !== '');
+		}
+		if (innerWidth < 1000) {
+			return scale.map((s, i) => (i % 2 === 0 ? s : '')).filter((s) => s !== '');
+		}
+		return scale;
 	};
 
 	onMount(resize);
 </script>
-<svelte:window on:resize={resize} />
+
+<svelte:window on:resize={resize} bind:innerWidth />
 <div class="container">
-	<div class="Xaxis" bind:this={leftScale}>
-		<p>upper</p>
-		<p>middle</p>
-		<p>lower</p>
-	</div>
+	{#if leftScale.length > 0}
+		<div class="Yaxis">
+			{#each leftScale.reverse() as scale}
+				<p>{scale}</p>
+			{/each}
+		</div>
+	{/if}
 	<div class="graph_frame">
 		<div class="dummy" />
 		<div bind:this={frame} class="graph">
 			<canvas bind:this={canvas} />
 		</div>
-		<div class="Yaxis" bind:this={yScale}>
-			<p>start</p>
-			<p>center</p>
-			<p>end</p>
+		{#if xScale.length > 0}
+			<div class="Xaxis">
+				{#each xScale as scale}
+					<p>{scale}</p>
+				{/each}
+			</div>
+		{/if}
+	</div>
+	{#if rightScale.length > 0}
+		<div class="Yaxis">
+			{#each rightScale.reverse() as scale}
+				<p>{scale}</p>
+			{/each}
 		</div>
-	</div>
-	<div class="Xaxis" bind:this={rightScale}>
-		<p>upper</p>
-		<p>middle</p>
-		<p>lower</p>
-	</div>
+	{/if}
 </div>
 
 <style lang="scss">
@@ -174,7 +186,7 @@
 		justify-content: space-between;
 		align-items: center;
 	}
-	div.Xaxis {
+	div.Yaxis {
 		width: max-content;
 		height: 100%;
 		box-sizing: border-box;
@@ -190,30 +202,35 @@
 		}
 	}
 	div.graph_frame {
-		flex: 1;
+		width: 0;
+		flex-grow: 1;
 		height: 100%;
-
 		display: flex;
 		flex-direction: column;
+		box-sizing: border-box;
+		padding: 0 0.5rem;
 		div.graph {
-			width: 100%;
 			flex: 1;
 		}
 		div.dummy {
 			height: 1rem;
 		}
 	}
-	div.Yaxis {
+
+	div.Xaxis {
 		width: 100%;
 		display: flex;
 		justify-content: space-between;
 		box-sizing: border-box;
 		p {
+			flex-basis: fit-content;
 			margin: 0;
 			text-align: center;
 			user-select: none;
+			text-overflow: ellipsis;
 		}
 	}
+
 	canvas {
 		box-sizing: border-box;
 		border: 1px solid black;

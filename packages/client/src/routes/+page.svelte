@@ -20,14 +20,14 @@
 	};
 	let scale = 1;
 	const URL = env.PUBLIC_API_URL ?? $page.url.origin + '/api';
-	let loading = true;
+	let graphComponent: Graph | undefined;
 
 	const getData = async () => {
 		const url = scale === 0.5 ? `${URL}/get` : `${URL}/get?scale=${scale}`;
 		const res = await fetch(url).then((r) => r.json());
 		data = (res.data as ThermoData[]).sort((a, b) => a.time - b.time);
 		nowData = data.length !== 0 ? data[data.length - 1] : null;
-		loading = false;
+		graphComponent?.reload(data);
 	};
 
 	onMount(() => {
@@ -39,31 +39,21 @@
 		const value = target.value;
 		const s = Number(value);
 		if (isNaN(s)) return;
-		loading = true;
 		scale = s;
 		getData();
 	};
 
 	const handleDataChange = () => {
-		loading = true;
-		setTimeout(() => {
-			loading = false;
-		}, 10);
+		graphComponent?.reload();
 	};
 
 	const handleReloadButton = async () => {
-		loading = true;
-		await getData();
+		getData();
 	};
 </script>
 
-{#if loading === false}
-	<Meter data={nowData} />
-	<Graph {data} displayInfo={selectedData} />
-{:else}
-	<Meter data={nowData} />
-	<Graph />
-{/if}
+<Meter data={nowData} />
+<Graph {data} displayInfo={selectedData} bind:this={graphComponent} />
 <div class="settings">
 	<div class="displayData">
 		<div>

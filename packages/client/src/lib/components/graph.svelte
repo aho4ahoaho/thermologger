@@ -4,34 +4,32 @@
 		graphDataGenerator,
 		type ThermoData,
 		type DisplayInfo,
-		type ViewData
 	} from '$lib';
 	import { onMount } from 'svelte';
 
 	export let data: ThermoData[] = [];
 	export let displayInfo: DisplayInfo = {
-		temperature: true,
+		temperature: true
 	};
 	//element
-	let canvas: HTMLCanvasElement;
-	let frame: HTMLDivElement;
+	let canvas: HTMLCanvasElement | undefined;
+	let frame: HTMLDivElement | undefined;
 	let innerWidth = 0;
 
 	//data
 	let leftScale: string[] = ['0℃', '99.9℃'];
 	let rightScale: string[] = ['0%', '99%'];
 	let xScale: string[] = ['0:00', '24:00'];
-	const viewData: ViewData[] = graphDataGenerator(data, displayInfo);
 
-	const resize = async () => {
-		if (!canvas) return;
+	export const reload = async(newdata: ThermoData[] = data) => {
+		if (!canvas || !frame) return;
 		if (canvas.width != null && canvas.height != null) {
 			canvas.width = 0;
 			canvas.height = 0;
 		}
 		const ctx = canvas.getContext('2d');
 		if (!ctx) return;
-		if (data.length === 0) {
+		if (newdata.length === 0) {
 			canvas.width = frame.clientWidth;
 			canvas.height = frame.clientHeight;
 			ctx.fillStyle = 'white';
@@ -42,30 +40,30 @@
 		leftScale =
 			displayInfo.temperature || displayInfo.MA_temperature
 				? scaleGenNum(
-						data.map((d) => d.temperature),
+						newdata.map((d) => d.temperature),
 						1,
 						'℃'
 				  )
 				: [];
 		rightScale =
-			displayInfo.humidity || displayInfo.MA_humidity 
+			displayInfo.humidity || displayInfo.MA_humidity
 				? scaleGenNum(
-						data.map((d) => d.humidity),
+						newdata.map((d) => d.humidity),
 						0,
 						'%'
 				  )
 				: [];
-		xScale = scaleGenDate(new Date(data[0].time), new Date(data[data.length - 1].time));
+		xScale = scaleGenDate(new Date(newdata[0].time), new Date(newdata[newdata.length - 1].time));
 
 		await new Promise((resolve) => setTimeout(resolve, 1));
 
-		const width = frame.clientWidth;
-		const height = frame.clientHeight;
+		canvas.width = frame.clientWidth;
+		canvas.height = frame.clientHeight;
+
+		const width = canvas.width;
+		const height = canvas.height;
 		const offset = 10;
 		const fontSize = height / 30;
-
-		canvas.width = width;
-		canvas.height = height;
 
 		ctx.fillStyle = 'white';
 		ctx.fillRect(0, 0, width, height);
@@ -89,10 +87,12 @@
 			ctx.closePath();
 		}
 
+		const viewData = graphDataGenerator(newdata, displayInfo);
+
 		// draw lines
 		viewData.forEach(({ color, data, range }) => {
 			ctx.strokeStyle = color;
-			strokeGraph(canvas, data, range);
+			canvas && strokeGraph(canvas, data, range);
 		});
 
 		// draw labels
@@ -115,16 +115,18 @@
 		for (let i = 0; i <= 10; i++) {
 			scale.push(min + step * i);
 		}
-		if (frame.clientHeight < 300) {
-			scale = scale.map((s, i) => (i % 5 === 0 ? s : undefined)).filter((s) => s !== undefined) as number[];
+		if ((frame?.clientHeight ?? 0) < 300) {
+			scale = scale
+				.map((s, i) => (i % 5 === 0 ? s : undefined))
+				.filter((s) => s !== undefined) as number[];
 		}
-		scale = scale.map((s) => s.toFixed(digits) + Unit)
+		scale = scale.map((s) => s.toFixed(digits) + Unit);
 		scale = Array.from(new Set(scale));
-		if(scale.length === 1){
-			scale = [scale[0] , scale[0]];
+		if (scale.length === 1) {
+			scale = [scale[0], scale[0]];
 		}
 
-		return scale
+		return scale;
 	};
 	const scaleGenDate = (start: Date, end: Date): string[] => {
 		const scale = [];
@@ -143,10 +145,15 @@
 		return scale;
 	};
 
-	onMount(resize);
+	onMount(reload);
 </script>
 
-<svelte:window on:resize={resize} bind:innerWidth />
+<svelte:window
+	on:resize={() => {
+		reload();
+	}}
+	bind:innerWidth
+/>
 <div class="container">
 	{#if leftScale.length > 0}
 		<div class="Yaxis">

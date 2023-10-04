@@ -134,12 +134,16 @@ export const graphDataGenerator = (
 		viewData.push({
 			label: 'Abs_Humidity',
 			color: 'rgb(192, 192, 0)',
-			data: data.map((d) =>{
+			data: data.map((d) => {
 				const T = d.temperature;
 				const RH = d.humidity;
 				const P = d.pressure;
-				return 0.622*(6.1078*10^(7.5*T/(T+237.3))*RH/100)/(P-(6.1078*10^(7.5*T/(T+237.3))*RH/100))*1000
-			}),
+				return (
+					((0.622 * ((6.1078 * 10) ^ ((((7.5 * T) / (T + 237.3)) * RH) / 100))) /
+						(P - ((6.1078 * 10) ^ ((((7.5 * T) / (T + 237.3)) * RH) / 100)))) *
+					1000
+				);
+			})
 		});
 	}
 	return viewData;
